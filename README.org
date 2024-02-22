@@ -1,0 +1,94 @@
+* kofi-genai
+
+Describe your project here.
+
+
+** Python Environment
+
+[[https://rye-up.com/][Rye: a Hassle-Free Python Experience]]: Installation and configuration
+
+
+On Posix run:
+
+#+begin_src bash
+
+curl -sSf https://rye-up.com/get | bash
+
+#+end_src
+
+On 64bit Windows download [[https://github.com/mitsuhiko/rye/releases/latest/download/rye-x86_64-windows.exe][rye-x86_64-windows.exe]].
+
+
+** Dependencies
+
+#+begin_src bash
+
+rye add tqdm scikit-learn       # add dependencies
+rye add --dev ruff pytest isort # add dev dependencies
+
+# then
+
+rye sync                        # updates the virtualenv based on the pyproject.toml
+
+#+end_src
+
+** Python Code Health
+
+Format code:
+
+#+begin_src bash
+
+rye run ruff format # Run the Ruff formatter on the given files or directories
+
+#+end_src
+
+** Configure and run applications
+
+Example Script Configuration:
+
+#+begin_src toml
+
+[tool.rye.scripts]
+myfirst-app = { cmd = "streamlit run ./PATH/TO/MY/firstapp.py" }
+demo-app = { cmd = "streamlit run ./DEMO/PATH/demoapp.py" }
+
+#+end_src
+
+Example Run:
+
+#+begin_src bash
+
+rye run myfirst-app # run app configured above
+
+# or
+
+rye run demo-app # run app configured above
+
+#+end_src
+
+* Infrastructure
+
+** AWS CDK
+
+[[https://aws.amazon.com/cdk/][AWS Cloud Development Kit:]] Define your cloud application resources using familiar programming languages
+
+#+begin_src bash
+
+npm -g aws-cdk
+
+#+end_src
+
+** Spawn JupyterLab on Sagemaker
+
+[[https://aws.amazon.com/sagemaker/][Amazon SageMaker:]] Build, train, and deploy machine learning (ML) models for any use case with fully managed infrastructure, tools, and workflows
+
+[[https://docs.aws.amazon.com/sagemaker/latest/dg/security_iam_service-with-iam.html][How Amazon SageMaker Works with IAM?]]
+
+#+begin_src bash
+
+cd infra && cdk deploy # Deploys the stack(s) named STACKS into your AWS account
+
+
+cd infra && cdk deploy # Destroy the stack(s) named STACKS
+
+#+end_src
