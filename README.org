@@ -1,5 +1,5 @@
 * kofi-genai
-the
+
 Describe your project here.
 
 
