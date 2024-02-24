@@ -66,15 +66,15 @@ class GenaiInfraStack(Stack):
             ),
         )
 
-        fastai_fastbook_repository = "FastAIFastBookRepository"
+        genai_repository = "GenAIRepo"
 
         sagemaker.CfnCodeRepository(
             self,
-            "GenaiFastAICodeRepository",
-            code_repository_name=fastai_fastbook_repository,
+            "GenAIRepo",
+            code_repository_name=genai_repository,
             git_config=sagemaker.CfnCodeRepository.GitConfigProperty(
                 branch="master",
-                repository_url="https://github.com/fastai/fastbook.git",
+                repository_url="https://github.com/kofi-boateng/genai.git",
             ),
         )
 
@@ -86,7 +86,7 @@ class GenaiInfraStack(Stack):
                 role_arn=role.role_arn,
                 instance_type="ml.c5.xlarge",  # "ml.p2.xlarge", # "ml.c5.2xlarge",
                 additional_code_repositories=[
-                    fastai_fastbook_repository,
+                    genai_repository,
                 ],
             ),
         )
