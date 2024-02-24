@@ -1,0 +1,596 @@
+
+#+author: Kofi Boateng
+#+title: Introduction To Natural Language Processing
+#+date: <2024-02-23 Fri>
+
+* Text Generation with RAG Development in Natural Language Processing
+
+** Course Overview:
+
+*** English
+
++ Introduction to natural language processing (NLP) and its applications in text generation.
++ Exploration of Retrieval+Augmented Generation (RAG).
++ Hands+on experience with RAG development and practical applications in creative writing, content generation, and more.
++ Implementation of a text generative application with.
++ Classification
+  - Summarization
+  - Translation
++ Technology stack includes
+  - [[https://huggingface.co/docs/transformers/en/index][Transformers]], [[https://engineering.fb.com/2017/03/29/data-infrastructure/faiss-a-library-for-efficient-similarity-search/][Vector+store DB (FAISS)]], [[https://www.python.org/][Python]], [[https://python.langchain.com/docs/get_started/introduction][LangChain]], [[https://streamlit.io/][Streamlit]]
+
+*** Français
+
++ Introduction au traitement du langage naturel (NLP) et à ses applications dans la génération de texte.
++ Exploration de la génération augmentée par récupération (RAG).
++ Expérience pratique avec le développement RAG et applications pratiques dans l'écriture créative, la génération de contenu, et plus encore.
++ Mise en œuvre d'une application de génération de texte avec.
++ Classification
+  - Résumé
+  - Traduction
++ La pile technologique comprend
+  - [[https://huggingface.co/docs/transformers/en/index][Transformers]], [[https://engineering.fb.com/2017/03/29/data-infrastructure/faiss-a-library-for-efficient-similarity-search/][Base de données de vecteurs (FAISS)]], [[https://www.python.org/][Python]], [[https://python.langchain.com/docs/get_started/introduction][LangChain]], [[https://streamlit.io/][Streamlit]]
+
+** Goals
+
+*** English
+
++ Understand the fundamentals of natural language processing (NLP) and its significance in various applications, particularly in text generation.
++ Gain familiarity with Retrieval-Augmented Generation (RAG) techniques and comprehend how they enhance text generation tasks.
++ Demonstrate the ability to build a text generative application incorporating classification, summarization, text generation, and a user-friendly graphical user interface (GUI) for seamless interaction.
++ Master the technology stack required for prototyping RAG development, including Transformers, Vector-store databases (e.g., FAISS), Python programming language, LangChain, and Streamlit framework.
+
+*** Français
+
++ Comprendre les fondamentaux du traitement du langage naturel (NLP) et son importance dans diverses applications, particulièrement dans la génération de texte.
++ Se familiariser avec les techniques de génération augmentée par récupération (RAG) et comprendre comment elles améliorent les tâches de génération de texte.
++ Démontrer la capacité à construire une application de génération de texte incorporant la classification, la résumé, la génération de texte, et une interface graphique utilisateur (GUI) conviviale pour une interaction fluide.
++ Maîtriser la pile technologique requise pour le prototypage du développement RAG, incluant les Transformers, les bases de données de vecteurs (par exemple, FAISS), le langage de programmation Python, LangChain, et le framework Streamlit.
+
+** What is Transformer?
+
+#+begin_src mermaid
+
+flowchart TD
+    A(INPUT) -->|Tokenized & Embedded| B
+    B -->|N=6 Layers| C[Encoder Stack]
+    C -->|Positional Encoding| D
+    D -->|Multi-Head Self-Attention| E
+    E -->|Add & Norm| F
+    F -->|Feed Forward| G
+    G -->|Add & Norm| H[Encoder Output]
+    H -->|Passed to Decoder| I[Decoder Stack]
+    I -->|Positional Encoding| J
+    J -->|Multi-Head Self-Attention| K
+    K -->|Add & Norm| L
+    L -->|Multi-Head Attention over Encoder Output| M
+    M -->|Add & Norm| N
+    N -->|Feed Forward| O
+    O -->|Add & Norm| P[Decoder Output]
+    P --> Q[Linear]
+    Q --> R[Softmax]
+    R --> S(OUTPUT)
+
+    subgraph ENCODER [Encoder]
+    B --> C
+    end
+
+    subgraph DECODER [Decoder]
+    I --> P
+    end
+
+    style ENCODER fill:#f9f,stroke:#333,stroke-width:2px
+    style DECODER fill:#bbf,stroke:#333,stroke-width:2px
+
+#+end_src
+
+*** English
+
+The **Transformer** is good at understanding prompts. The transformer architecture is made up of different components introduced in [[https://arxiv.org/pdf/1706.03762.pdf][the original paper /"Attention Is All You Need"/ by Vaswani et al]].
+The components include:
+
++ **Stack of Identical Layers:** The encoder consists of a stack of /_N = 6_/ identical layers. Each layer performs a series of operations on the input data.
++ **Sub-Layers:** Each layer in the encoder has two sub-layers:
+  - _Multi-Head Self-Attention Mechanism:_ The first sub-layer applies a multi-head self-attention mechanism to the input data. This mechanism allows the model to weigh the importance of different words in the input sequence when encoding each word's representation.
+  - _Feed-Forward Network:_ The second sub-layer is a simple, position-wise fully connected feed-forward network. It applies a linear transformation followed by a non-linear activation function (typically [[https://machinelearningmastery.com/rectified-linear-activation-function-for-deep-learning-neural-networks/][ReLU]]) independently to each position in the sequence.
++ **Residual Connections:** A residual connection, also known as a skip connection, is employed around each of the two sub-layers. This means that the input to each sub-layer is added to its output before passing through the layer normalization step. This helps in mitigating the vanishing gradient problem during training and facilitates the flow of information through the network.
++ **Layer Normalization:** After the residual connection, layer normalization is applied. Layer normalization normalizes the activations of each layer across the feature dimension, helping in stabilizing the training process.
++ **Dimensionality:** To facilitate the residual connections, all sub-layers in the model, as well as the embedding layers, produce outputs of dimension /_d_model = 512_/. This means that the output dimensionality of each sub-layer and the embedding layers is /_512_/, which is a hyperparameter of the model.
+
+
+**Decoder:** The decoder is also composed of a stack of /_N = 6_/ identical layers. In addition to the two sub-layers in each encoder layer, the decoder inserts a third sub-layer, which performs multi-head attention over the output of the encoder stack. Similar to the encoder, we employ residual connections around each of the sub-layers, followed by layer normalization. We also modify the self-attention sub-layer in the decoder stack to prevent positions from attending to subsequent positions. This masking, combined with fact that the output embeddings are offset by one position, ensures that the predictions for position /_i_/ can depend only on the known outputs at positions less than /_i_/.
+
+*** Français
+
+Le **Transformateur** est doué pour comprendre les instructions. L'architecture du transformateur se compose de différents composants introduits dans [[https://arxiv.org/pdf/1706.03762.pdf][l'article original /"L'attention, c'est tout ce dont vous avez besoin"/ par Vaswani et al]].
+Les composants incluent :
+
++ **Pile de couches identiques :** L'encodeur est constitué d'une pile de /_N = 6_/ couches identiques. Chaque couche effectue une série d'opérations sur les données d'entrée.
++ **Sous-couches :** Chaque couche de l'encodeur a deux sous-couches :
+  - _Mécanisme d'auto-attention multi-têtes :_ La première sous-couche applique un mécanisme d'auto-attention multi-têtes aux données d'entrée. Ce mécanisme permet au modèle de peser l'importance des différents mots dans la séquence d'entrée lors de l'encodage de la représentation de chaque mot.
+  - _Réseau de neurones feed-forward :_ La deuxième sous-couche est un réseau de neurones feed-forward entièrement connecté et positionnel. Il applique une transformation linéaire suivie d'une fonction d'activation non linéaire (typiquement [[https://machinelearningmastery.com/rectified-linear-activation-function-for-deep-learning-neural-networks/][ReLU]]) indépendamment à chaque position dans la séquence.
++ **Connexions résiduelles :** Une connexion résiduelle, également connue sous le nom de connexion de saut, est employée autour de chacune des deux sous-couches. Cela signifie que l'entrée de chaque sous-couche est ajoutée à sa sortie avant de passer par l'étape de normalisation de couche. Cela aide à atténuer le problème de disparition de gradient pendant l'entraînement et facilite le flux d'informations à travers le réseau.
++ **Normalisation de couche :** Après la connexion résiduelle, une normalisation de couche est appliquée. La normalisation de couche normalise les activations de chaque couche à travers la dimension des caractéristiques, aidant à stabiliser le processus d'entraînement.
++ **Dimensionnalité :** Pour faciliter les connexions résiduelles, toutes les sous-couches du modèle, ainsi que les couches d'embedding, produisent des sorties de dimension /_d_model = 512_/. Cela signifie que la dimensionnalité de sortie de chaque sous-couche et des couches d'embedding est de /_512_/, qui est un hyperparamètre du modèle.
+
+
+**Décodeur :** Le décodeur est également composé d'une pile de /_N = 6_/ couches identiques. En plus des deux sous-couches dans chaque couche d'encodeur, le décodeur insère une troisième sous-couche, qui effectue une attention multi-têtes sur la sortie de la pile d'encodeur. De manière similaire à l'encodeur, nous employons des connexions résiduelles autour de chacune des sous-couches, suivies par une normalisation de couche. Nous modifions également la sous-couche d'auto-attention dans la pile de décodeur pour empêcher les positions d'assister aux positions ultérieures. Ce masquage, combiné au fait que les embeddings de sortie sont décalés d'une position, assure que les prédictions pour la position /_i_/ peuvent dépendre uniquement des sorties connues aux positions inférieures à /_i_/.
+
+#+begin_src mermaid
+
+flowchart TB
+    subgraph encoder [Encoder]
+        direction TB
+        enc_input(Input Embedding) --> enc_pos(Positional Encoding)
+        enc_pos --> enc_Nx1[Multi-Head Attention]
+        enc_Nx1 --> enc_addnorm1[Add & Norm]
+        enc_addnorm1 --> enc_ff1[Feed Forward]
+        enc_ff1 --> enc_addnorm2[Add & Norm]
+        enc_addnorm2 -.-> enc_Nx2[Multi-Head Attention]
+        enc_Nx2 -.-> enc_addnorm3[Add & Norm]
+        enc_addnorm3 -.-> enc_ff2[Feed Forward]
+        enc_ff2 -.-> enc_addnorm4[Add & Norm]
+        enc_addnorm4 -.-> enc_NxN[...]
+        enc_NxN -.-> enc_output[Encoder Output]
+    end
+
+    subgraph decoder [Decoder]
+        direction TB
+        dec_input(Output Embedding) --> dec_pos(Positional Encoding)
+        dec_pos --> dec_Nx1[Masked Multi-Head Attention]
+        dec_Nx1 --> dec_addnorm1[Add & Norm]
+        dec_addnorm1 --> dec_ff1[Feed Forward]
+        dec_ff1 --> dec_addnorm2[Add & Norm]
+        dec_addnorm2 -.-> dec_Nx2[Masked Multi-Head Attention]
+        dec_Nx2 -.-> dec_addnorm3[Add & Norm]
+        dec_addnorm3 -.-> dec_ff2[Feed Forward]
+        dec_ff2 -.-> dec_addnorm4[Add & Norm]
+        dec_addnorm4 -.-> dec_NxN[...]
+        dec_NxN -.-> dec_output[Decoder Output]
+    end
+
+    enc_output --> dec_input
+    dec_output --> lin[Linear]
+    lin --> softmax[Softmax]
+    softmax --> out(Output Probabilities)
+
+    %% Styling
+    classDef addnorm fill:#FFDD6B,stroke:#333,stroke-width:2px;
+    class enc_addnorm1,enc_addnorm2,enc_addnorm3,enc_addnorm4,dec_addnorm1,dec_addnorm2,dec_addnorm3,dec_addnorm4 addnorm;
+    classDef feedforward fill:#6BCB77,stroke:#333,stroke-width:2px;
+    class enc_ff1,enc_ff2,dec_ff1,dec_ff2 feedforward;
+    classDef attention fill:#4D96FF,stroke:#333,stroke-width:2px;
+    class enc_Nx1,dec_Nx1,dec_Nx2 attention;
+    classDef embedding fill:#FFAFCC,stroke:#333,stroke-width:2px;
+    class enc_input,dec_input embedding;
+    classDef softmaxlinear fill:#DB6E6E,stroke:#333,stroke-width:2px;
+    class lin,softmax softmaxlinear;
+    classDef output fill:#FFFFFF,stroke:#333,stroke-width:2px;
+    class out output;
+
+#+end_src
+
+** Self-Attention Mechanism
+
+*** English
+
++ Imagine you're reading a sentence, and you want to understand the meaning of each word in relation to the entire sentence. Self-attention allows the model to focus on different parts of the input sequence when processing each word, similar to how you might pay attention to different words as you read.
+
+*** Français
+
++ Imaginez que vous lisiez une phrase et que vous vouliez comprendre la signification de chaque mot par rapport à la phrase entière. L'auto-attention permet au modèle de se concentrer sur différentes parties de la séquence d'entrée lors du traitement de chaque mot, un peu comme vous pourriez faire attention à différents mots en lisant.
+
+
+** Encoder-Decoder
+
+*** English
+
++ Transformers typically consist of two main parts: an encoder and a decoder. The encoder processes the input data, such as a sentence in one language, while the decoder generates the output, such as the translated sentence in another language.
+
+*** Français
+
++ Les transformateurs sont généralement composés de deux parties principales : un encodeur et un décodeur. L'encodeur traite les données d'entrée, comme une phrase dans une langue, tandis que le décodeur génère la sortie, comme la phrase traduite dans une autre langue.
+
+** Multi-head Attention
+
+*** English
+
++ This component allows the model to jointly attend to information from different representation subspaces at different positions. It's like having multiple experts looking at different aspects of the input data and combining their insights to make a more informed decision.
+
+*** Français
+
++ Ce composant permet au modèle de prêter attention conjointement à des informations provenant de différents sous-espaces de représentation à différentes positions. C'est comme si on avait plusieurs experts qui regardent différents aspects des données d'entrée et combinent leurs aperçus pour prendre une décision plus éclairée.
+
+** Positional encoding
+
+*** English
+
++ Unlike traditional recurrent neural networks ([[https://machinelearningmastery.com/an-introduction-to-recurrent-neural-networks-and-the-math-that-powers-them/][RNNs]]), which inherently understand the order of input sequences, transformers don't have this built-in understanding. Positional encoding is a way to inject information about the position of each word into the model, helping it understand the sequential nature of the data.
+
+*** Français
+
++ Contrairement aux réseaux neuronaux récurrents traditionnels ([[https://machinelearningmastery.com/an-introduction-to-recurrent-neural-networks-and-the-math-that-powers-them/][RNNs]]), qui comprennent intrinsèquement l'ordre des séquences d'entrée, les transformateurs n'ont pas cette compréhension intégrée. L'encodage positionnel est une façon d'injecter des informations sur la position de chaque mot dans le modèle, l'aidant à comprendre la nature séquentielle des données.
+
+
+** Feedforward Neural Network
+
+*** English
+
++ After processing the input sequence with self-attention mechanisms, transformers typically use feedforward neural networks to further transform the representations of the input data before passing them to the next layer.
++ Pros:
+  - Achieves Parallelization
+  - Long reaching meanings
+
+*** Français
+
++ Après avoir traité la séquence d'entrée avec des mécanismes d'auto-attention, les transformateurs utilisent généralement des réseaux neuronaux avance rapide pour transformer davantage les représentations des données d'entrée avant de les passer à la couche suivante.
++ Avantages :
+  - Permet la parallélisation
+  - Compréhension de sens à longue portée
+
+** Tokenizer
+
+*** English
+
++ A **tokenizer** is a fundamental component in [[https://www.ibm.com/topics/natural-language-processing][natural language processing (NLP)]] that breaks down text into smaller units, typically words or subwords, called tokens. These tokens serve as the basic building blocks for further analysis by NLP models.
++ **Word Tokenizers:** These tokenize text by splitting it into individual words based on spaces or punctuation marks.
++ **Subword Tokenizer:** Subword tokenization breaks down words into smaller meaningful units, such as prefixes, suffixes, or roots.
++ **Character Tokenizers:** Character-level tokenization breaks text down into individual characters. This approach is useful when dealing with languages with complex morphology or when handling tasks like text generation, where character-level representations may be more appropriate.
+
+
+Companies developing [[https://aws.amazon.com/what-is/foundation-models/][foundation models]]:
+
++ OpenAI, Google, Meta, Microsoft, Amazon, IBM etc
+
+
+**Models:**
++ [[https://huggingface.co/docs/transformers/model_doc/bert][BERT (Bidirectional Encoder Representations from Transformers)]] from Meta
++ [[https://ai.meta.com/blog/roberta-an-optimized-method-for-pretraining-self-supervised-nlp-systems/][RoBERTa]], LLama from Meta
++ [[https://platform.openai.com/docs/models][GPT Series]] from OpenAI
+
+
+**Use Cases:**
++ Semantic-Analysis
++ Translation
++ Summarization
++ ChatBot
+
+*** Français
+
++ Un **tokeniseur** est un composant fondamental dans le [[https://www.ibm.com/topics/natural-language-processing][traitement du langage naturel (NLP)]] qui décompose le texte en unités plus petites, typiquement des mots ou des sous-mots, appelés tokens. Ces tokens servent de blocs de construction de base pour l'analyse ultérieure par les modèles de NLP.
++ **Tokeniseurs de mots :** Ces tokeniseurs décomposent le texte en mots individuels en se basant sur les espaces ou les signes de ponctuation.
++ **Tokeniseur de sous-mots :** La tokenisation de sous-mots décompose les mots en unités signifiantes plus petites, telles que les préfixes, les suffixes ou les racines.
++ **Tokeniseurs de caractères :** La tokenisation au niveau des caractères décompose le texte en caractères individuels. Cette approche est utile lorsqu'on traite des langues à morphologie complexe ou lorsqu'on gère des tâches comme la génération de texte, où les représentations au niveau des caractères peuvent être plus appropriées.
+
+
+Entreprises développant des [[https://aws.amazon.com/what-is/foundation-models/][modèles de fondation]] :
+
++ OpenAI, Google, Meta, Microsoft, Amazon, IBM etc
+
+
+**Modèles :**
++ [[https://huggingface.co/docs/transformers/model_doc/bert][BERT (Bidirectional Encoder Representations de Transformers)]] de Meta
++ [[https://ai.meta.com/blog/roberta-an-optimized-method-for-pretraining-self-supervised-nlp-systems/][RoBERTa]], LLama de Meta
++ [[https://platform.openai.com/docs/models][Séries GPT]] d'OpenAI
+
+
+**Cas d'utilisation :**
++ Analyse sémantique
++ Traduction
++ Résumé
++ ChatBot
+
+
+** Demo
+
++ NLP - Classification / Translation / Summarization
++ Code (**NLP/app.py**):
+
+#+begin_src python
+
+import streamlit as st
+from transformers import pipeline
+from transformers import AutoTokenizer, T5Tokenizer
+from transformers import T5ForConditionalGeneration
+
+## Sentiment-Analysis/Classification
+classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
+
+## Translation from English to German
+model_name = "google/flan-t5-large"
+flan_tokenizer = T5Tokenizer.from_pretrained(model_name)
+flan_model = T5ForConditionalGeneration.from_pretrained(model_name)
+
+## Summarization
+bart_model_name = "facebook/bart-large-cnn"
+summarizer = pipeline("summarization", model=bart_model_name)
+
+
+# Function to classify sequence
+def classify_text(sequence_to_classify, candidate_labels):
+    results = classifier(sequence_to_classify, candidate_labels)
+    max_value, max_index = max(
+        (value, index) for index, value in enumerate(results["scores"])
+    )
+    st.write(((results["labels"])[max_index]).upper())
+
+
+# Function to Translate text
+def generate_text(prompt_text):
+    text_embeddings = flan_tokenizer(
+        "Translate text from English to German: " + prompt_text, return_tensors="pt"
+    ).input_ids
+    model_output = flan_model.generate(text_embeddings, max_new_tokens=50)
+    # Decode and print response
+    del_response = flan_tokenizer.decode(model_output[0], skip_special_tokens=True)
+    st.write(del_response)
+
+
+# Function to summarize text
+def summarize_text(prompt_text):
+    st.write(
+        summarizer(prompt_text, max_length=130, min_length=30, do_sample=False)[0][
+            "summary_text"
+        ]
+    )
+
+
+## add in casual language modeling include prompt engineering + finetuning
+
+
+# Function to start chatbot
+def start_chatbot(prompt_text):
+    pass
+    st.write(" ")
+
+
+if __name__ == "__main__":
+    st.title("Generative AI Use Cases")
+    prompt_text = st.text_input("Translate English to German:", value=" ")
+    if prompt_text != " ":
+        generate_text(prompt_text)
+
+    seq2classify = st.text_input("Sequence to classify", value=" ")
+    if seq2classify != " ":
+        candidate_labels = ["POSITIVE", "NEUTRAL", "NEGATIVE"]
+        classify_text(seq2classify, candidate_labels)
+
+    prompt_text_sum = st.text_input("Enter text to summarize:", value=" ")
+    if prompt_text_sum != " ":
+        summarize_text(prompt_text_sum)
+
+#+end_src
+
+
+
+** Retrieval Augmented Generation (RAG Development)
+
+*** English
+
+What is [[https://aws.amazon.com/what-is/retrieval-augmented-generation/][RAG]]?
+
+**** Introduction to Retrieval Augmented Generation (RAG)
+
++ Retrieval Augmented Generation (RAG) is an approach that combines traditional text generation techniques with retrieval-based methods to improve the quality and relevance of generated responses in conversational AI systems.
++ In traditional generative models like GPT, responses are generated solely based on the input query or context. However, in RAG, the model also retrieves relevant documents or passages from a database and incorporates them into the generation process.
+
+**** Key Concepts
+
++ Retrieval Models: These models are responsible for retrieving relevant documents or passages from a database based on the input query.
++ Generation Models: These models generate responses by incorporating information from both the input query and the retrieved documents.
++ Semantic Search: RAG relies on semantic search techniques to retrieve documents that are semantically similar to the input query, rather than relying solely on keyword matching.
+
+**** Benefits
+
++ RAG improves the relevance and coherence of generated responses by incorporating external knowledge from retrieved documents.
++ It allows the chatbot to provide more informative and contextually relevant responses, enhancing the overall user experience.
+
+**** Applications
+
++ RAG is widely used in conversational AI systems, chatbots, question answering systems, and information retrieval applications.
++ It can be applied in various domains such as customer support, healthcare, education, and e-commerce to provide personalized and accurate responses to user queries.
+
+*** Français
+
+Qu'est-ce que [[https://aws.amazon.com/what-is/retrieval-augmented-generation/][RAG]] ?
+
+**** Introduction à la génération augmentée par récupération (RAG)
+
++ La génération augmentée par récupération (RAG) est une approche qui combine les techniques traditionnelles de génération de texte avec des méthodes basées sur la récupération pour améliorer la qualité et la pertinence des réponses générées dans les systèmes de conversation AI.
++ Dans les modèles génératifs traditionnels comme GPT, les réponses sont générées uniquement sur la base de la requête d'entrée ou du contexte. Cependant, dans RAG, le modèle récupère également des documents ou des passages pertinents d'une base de données et les intègre dans le processus de génération.
+
+**** Concepts clés
+
++ Modèles de récupération : Ces modèles sont responsables de la récupération de documents ou passages pertinents d'une base de données sur la base de la requête d'entrée.
++ Modèles de génération : Ces modèles génèrent des réponses en incorporant des informations provenant à la fois de la requête d'entrée et des documents récupérés.
++ Recherche sémantique : RAG s'appuie sur des techniques de recherche sémantique pour récupérer des documents qui sont sémantiquement similaires à la requête d'entrée, plutôt que de se baser uniquement sur une correspondance de mots-clés.
+
+**** Avantages
+
++ RAG améliore la pertinence et la cohérence des réponses générées en incorporant des connaissances externes provenant de documents récupérés.
++ Cela permet au chatbot de fournir des réponses plus informatives et contextuellement pertinentes, améliorant ainsi l'expérience utilisateur globale.
+
+**** Applications
+
++ RAG est largement utilisé dans les systèmes de conversation AI, les chatbots, les systèmes de réponse aux questions et les applications de récupération d'informations.
++ Il peut être appliqué dans divers domaines tels que le support client, les soins de santé, l'éducation et le commerce électronique pour fournir des réponses personnalisées et précises aux requêtes des utilisateurs.
+
+
+** Overview of LangChain and its Components:
+
+*** English
+
+**** LangChain
+
++ [[https://python.langchain.com/docs/get_started/introduction][LangChain]] is a framework that facilitates the integration of retrieval models with language models for retrieval augmented generation tasks.
++ It provides a unified interface for building chatbots and conversational AI systems with enhanced response generation capabilities.
+
+**** Components
+
++ **Natural Language Processing (NLP) Pipeline:** LangChain incorporates a comprehensive NLP pipeline for tasks such as tokenization, embedding generation, and semantic similarity calculation.
++ **Retrieval Models Integration:** LangChain seamlessly integrates retrieval models, allowing the system to retrieve relevant documents or passages based on the input query.
+  - **Dense Retrieval Retriever-Reader (DRQA):** This model retrieves relevant documents from a large corpus using dense vector representations and then uses a reader model to extract relevant information from these documents to generate responses.
+  - **Neural Generative Conversational Model with Retrieval Mechanism:** This model first retrieves relevant context or responses from a large database of previous conversations using information retrieval techniques and then generates responses based on both the retrieved context and the current input.
+  - **Dual Encoder with Retrieval-Augmented Generation (DIALOGPT):** This architecture uses a dual encoder to encode both the input query and the retrieved context, then generates a response based on this combined representation. It can be fine-tuned on conversational data to generate more contextually relevant responses.
+  - **Sequential Retrieval Model (SeqRM):** This model sequentially retrieves relevant passages from a knowledge base and incorporates them into the generation process. At each step of generation, it retrieves the most relevant passage based on the current context and generates the next token accordingly.
+  - **BERT for Retriever-Reader (BRR):** This model employs BERT-based retriever and reader components. The retriever selects relevant passages from a large corpus, and the reader extracts relevant information from these passages to generate responses.
++ **Language Models Integration:** It also integrates language models for response generation, enabling the system to generate coherent and contextually relevant responses by incorporating information from both the input query and retrieved documents.
++ **Vector Database Interface:** LangChain provides an interface for interacting with [[https://www.ibm.com/topics/vector-database][vector databases]], allowing users to efficiently store and retrieve document embeddings for semantic search.
+  - **Milvus:** [[https://milvus.io/][Milvus]] is an open-source vector database designed for managing and serving vector embeddings at scale. It supports a variety of similarity search algorithms and provides efficient indexing and querying capabilities.
+  - **Faiss:** Developed by Facebook AI Research (FAIR), [[https://engineering.fb.com/2017/03/29/data-infrastructure/faiss-a-library-for-efficient-similarity-search/][Faiss]] is a widely-used library for efficient similarity search and clustering of dense vectors. It is optimized for high-dimensional vectors and offers GPU-accelerated indexing and querying.
+  - **Annoy:** [[https://github.com/spotify/annoy][Annoy]] (Approximate Nearest Neighbors Oh Yeah) is a C++ library with Python bindings for approximate nearest neighbor search. It is designed for large-scale similarity search tasks and supports both CPU and GPU implementations.
+  - **Pinecone:** [[https://www.pinecone.io/][Pinecone]] is a managed vector database service that provides real-time similarity search and recommendation capabilities. It offers a serverless architecture, automatic scaling, and integration with popular machine learning frameworks.
+  - **Elasticsearch with Vector Plugin:** Elasticsearch is a distributed search and analytics engine that can be extended with plugins to support vector data. The [[https://www.elastic.co/elasticsearch/vector-database][Elasticsearch Vector Plugin]] allows indexing and querying of vector embeddings, enabling similarity search within Elasticsearch.
+  - **HNSW (Hierarchical Navigable Small World):** While not a standalone database, [[https://www.pinecone.io/learn/series/faiss/hnsw/][HNSW]] is a data structure and algorithm commonly used for approximate nearest neighbor search. It can be integrated into existing databases or search engines to enable efficient similarity search.
+
+**** Usage
+
++ LangChain can be used to build chatbots, question answering systems, and information retrieval applications that leverage both generative and retrieval-based techniques for response generation.
++ It provides flexibility and extensibility, allowing developers to customize and fine-tune the system according to specific use cases and requirements.
+
+*** Français
+
+**** LangChain
+
++ [[https://python.langchain.com/docs/get_started/introduction][LangChain]] est un cadre qui facilite l'intégration de modèles de récupération avec des modèles de langage pour des tâches de génération augmentée par récupération.
++ Il fournit une interface unifiée pour la construction de chatbots et de systèmes de conversation AI avec des capacités améliorées de génération de réponses.
+
+**** Composants
+
++ **Pipeline de Traitement du Langage Naturel (NLP) :** LangChain intègre un pipeline NLP complet pour des tâches telles que la tokenisation, la génération d'embedding et le calcul de similarité sémantique.
++ **Intégration de Modèles de Récupération :** LangChain intègre de manière transparente des modèles de récupération, permettant au système de récupérer des documents ou des passages pertinents en fonction de la requête d'entrée.
+  - **Retriever-Reader de Récupération Dense (DRQA) :** Ce modèle récupère des documents pertinents d'un large corpus en utilisant des représentations vectorielles denses puis utilise un modèle lecteur pour extraire des informations pertinentes de ces documents afin de générer des réponses.
+  - **Modèle Conversationnel Génératif Neuronal avec Mécanisme de Récupération :** Ce modèle récupère d'abord le contexte ou les réponses pertinents d'une grande base de données de conversations antérieures en utilisant des techniques de récupération d'informations puis génère des réponses basées à la fois sur le contexte récupéré et l'entrée actuelle.
+  - **Encodeur Dual avec Génération Augmentée par Récupération (DIALOGPT) :** Cette architecture utilise un encodeur dual pour encoder à la fois la requête d'entrée et le contexte récupéré, puis génère une réponse basée sur cette représentation combinée. Il peut être ajusté sur des données conversationnelles pour générer des réponses plus contextuellement pertinentes.
+  - **Modèle de Récupération Séquentielle (SeqRM) :** Ce modèle récupère séquentiellement des passages pertinents d'une base de connaissances et les intègre dans le processus de génération. À chaque étape de la génération, il récupère le passage le plus pertinent en fonction du contexte actuel et génère le jeton suivant en conséquence.
+  - **BERT pour Retriever-Reader (BRR) :** Ce modèle emploie des composants retriever et reader basés sur BERT. Le retriever sélectionne des passages pertinents d'un large corpus, et le reader extrait des informations pertinentes de ces passages pour générer des réponses.
++ **Intégration de Modèles de Langage :** Il intègre également des modèles de langage pour la génération de réponses, permettant au système de générer des réponses cohérentes et contextuellement pertinentes en incorporant des informations à la fois de la requête d'entrée et des documents récupérés.
++ **Interface de Base de Données Vectorielle :** LangChain fournit une interface pour interagir avec [[https://www.ibm.com/topics/vector-database][les bases de données vectorielles]], permettant aux utilisateurs de stocker et de récupérer efficacement des embeddings de documents pour la recherche sémantique.
+  - **Milvus :** [[https://milvus.io/][Milvus]] est une base de données vectorielle open-source conçue pour gérer et servir des embeddings vectoriels à grande échelle. Elle prend en charge une variété d'algorithmes de recherche de similarité et offre des capacités efficaces d'indexation et de requête.
+  - **Faiss :** Développé par Facebook AI Research (FAIR), [[https://engineering.fb.com/2017/03/29/data-infrastructure/faiss-a-library-for-efficient-similarity-search/][Faiss]] est une bibliothèque largement utilisée pour la recherche de similarité et le clustering de vecteurs denses efficaces. Elle est optimisée pour les vecteurs de haute dimension et offre des capacités d'indexation et de requête accélérées par GPU.
+  - **Annoy :** [[https://github.com/spotify/annoy][Annoy]] (Approximate Nearest Neighbors Oh Yeah) est une bibliothèque C++ avec des liaisons Python pour la recherche approximative des plus proches voisins. Elle est conçue pour les tâches de recherche de similarité à grande échelle et prend en charge les implémentations CPU et GPU.
+  - **Pinecone :** [[https://www.pinecone.io/][Pinecone]] est un service de base de données vectorielle géré qui fournit des capacités de recherche de similarité et de recommandation en temps réel. Il offre une architecture sans serveur, une mise à l'échelle automatique et une intégration avec des cadres d'apprentissage automatique populaires.
+  - **Elasticsearch avec Plugin Vectoriel :** Elasticsearch est un moteur de recherche et d'analyse distribué qui peut être étendu avec des plugins pour supporter les données vectorielles. Le [[https://www.elastic.co/elasticsearch/vector-database][Plugin Vectoriel Elasticsearch]] permet l'indexation et la requête d'embeddings vectoriels, activant la recherche de similarité au sein d'Elasticsearch.
+  - **HNSW (Hierarchical Navigable Small World) :** Bien qu'il ne soit pas une base de données autonome, [[https://www.pinecone.io/learn/series/faiss/hnsw/][HNSW]] est une structure de données et un algorithme couramment utilisé pour la recherche approximative des plus proches voisins. Il peut être intégré dans des bases de données ou des moteurs de recherche existants pour permettre une recherche de similarité efficace.
+
+**** Utilisation
+
++ LangChain peut être utilisé pour construire des chatbots, des systèmes de réponse aux questions et des applications de récupération d'informations qui tirent parti des techniques génératives et basées sur la récupération pour la génération de réponses.
++ Il offre de la flexibilité et de l'extensibilité, permettant aux développeurs de personnaliser et d'ajuster le système selon des cas d'utilisation et des exigences spécifiques.
+
+
+** Explanation of the Architecture Document
+
+#+begin_src mermaid
+
+
+
+#+end_src
+
+*** English
+
+**** Demo - We are going to explore LLM implementation
+
++ Demo - We are going to explore LLM implementation
++ Context prompt + LLM
++ Multi-sources Context prompt + LLM
+
+
+*** Français
+
+
+**** Démo - Nous allons explorer la mise en œuvre de LLM
+
++ Démo - Nous allons explorer la mise en œuvre de LLM
++ Contexte d'invite + LLM
++ Contexte d'invite multi-sources + LLM
+
+*** Code (**RAG_Development/rag_demo.py**) :
+
+#+begin_src python
+
+# !pip install -q torch transformers accelerate bitsandbytes transformers sentence-transformers faiss-cpu pypdf streamlit langchain==0.1.6 langchain-community==0.0.19 langchain-core==0.1.23
+# !pip install -q torch transformers
+# !pip install -q transformers sentence-transformers
+# !pip install -q faiss-cpu pypdf streamlit
+# !pip install -q langchain==0.1.6 langchain-community==0.0.19 langchain-core==0.1.23
+
+import locale  # In Google Colab, use UTF-8 locale to install LangChain
+from langchain_community.document_loaders import PyPDFLoader
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_community.vectorstores import FAISS
+from langchain_community.embeddings import HuggingFaceEmbeddings
+from transformers import pipeline
+from langchain_community.llms import HuggingFacePipeline
+from langchain_core.prompts import ChatPromptTemplate
+from langchain.chains import LLMChain
+from langchain.schema.runnable import RunnablePassthrough
+import streamlit as st
+
+locale.getpreferredencoding = lambda: "UTF-8"
+
+# Constants
+PDF_FILE_PATH = "test_pdf.pdf"  # Update with your file path
+CHUNK_SIZE = 500
+CHUNK_OVERLAP = 100
+OLLAMA_MODEL_NAME = "mistral"
+
+loader = PyPDFLoader(PDF_FILE_PATH)
+pages = loader.load_and_split()
+
+print(f"Pages from the loader: {pages[0]} \n\n")
+
+text_splitter = RecursiveCharacterTextSplitter(
+    chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP
+)
+doc_splits = text_splitter.split_documents(pages)
+
+print(f"Pages from the loader: {doc_splits} \n\n")
+
+db = FAISS.from_documents(
+    doc_splits, HuggingFaceEmbeddings(model_name="BAAI/bge-base-en-v1.5")
+)
+retriever = db.as_retriever(search_type="similarity", search_kwargs={"k": 4})
+
+## Summarization
+bart_model_name = "facebook/bart-large-cnn"
+summarizer = pipeline("summarization", model=bart_model_name)
+
+llm = HuggingFacePipeline(pipeline=summarizer)
+
+prompt = ChatPromptTemplate.from_messages(
+    [("system", "Summarize the story about Daisy:\n\n{context}")]
+)
+
+llm_chain = LLMChain(llm=llm, prompt=prompt)
+
+"""**Combine the LLM + Retriever to create the RAG**"""
+# retriever = db.as_retriever()
+rag_chain = {"context": retriever, "question": RunnablePassthrough()} | llm_chain
+
+# question = "Tell a story about a girl in the country side"
+
+# print(llm_chain.invoke({"context": "", "question": question}))
+# print('\n\n\n')
+# print(rag_chain.invoke(question))
+
+if __name__ == "__main__":
+    st.title("Summarization with RAG Development")
+    question = st.text_input("Summarize tex:", value=" ")
+    if question != " ":
+        st.title("Summarization - LLM Chain with no context")
+        st.write(llm_chain.invoke({"context": "", "question": question})["text"])
+
+    if question != " ":
+        st.title("Summarization with RAG")
+        st.write(rag_chain.invoke(question)["text"])
+
+#+end_src
+
+** Resources
+
++ Attention Is All You Need: https://arxiv.org/pdf/1706.03762.pdf
++ Hugging Face: https://huggingface.co/
++ LangChain Framework: https://www.langchain.com/
++ Python: https://www.python.org/
++ Streamlit: https://streamlit.io/

@@ -1,7 +1,6 @@
 * kofi-genai
 
-Describe your project here.
-
+Read the article: [[file:introduction-to-natural-language-processing.org][Introduction To Natural Language Processing]]
 
 ** Python Environment
 
